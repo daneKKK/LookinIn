@@ -145,6 +145,8 @@ def process_face(face_landmarks_3d, h, w, frame_counter):
     face_landmarks_3d[:, 1] = h*(1 - face_landmarks_3d[:, 1])
     face_landmarks_3d[:, 2] *= w
     
+    
+    # Scaling everything to convert to real 3D space
     face_landmarks_3d[:, 0] -= w/2
     face_landmarks_3d[:, 1] -= h/2
     
@@ -198,13 +200,12 @@ def process_face(face_landmarks_3d, h, w, frame_counter):
     x_left_descriptor, y_left_descriptor = left_eye_dir[0], left_eye_dir[1]
     x_right_descriptor, y_right_descriptor = right_eye_dir[0], right_eye_dir[1]
     face_x_pos_descriptor, face_y_pos_descriptor = np.mean(face_landmarks_3d, axis=0)[0], np.mean(face_landmarks_3d, axis=0)[1]
+    head_position = np.mean(face_landmarks_3d[PLANE_INDICES], axis=0)
     
-    descriptors = [z_descriptor, x_left_descriptor, y_left_descriptor,
-                   x_right_descriptor, y_right_descriptor,
-                   face_x_pos_descriptor, face_y_pos_descriptor]
+    #Сохраняем дескрипторы: позиция головы, центр левого глаза, центр правого глаза, направление левого глаза, направление правого глаза
+    descriptors = (head_position, left_eye_sphere_c, right_eye_sphere_c, left_eye_dir, right_eye_dir)
     
-    # --- ЛОГИКА СОХРАНЕНИЯ В ФАЙЛ ---
-    # Проверяем, настал ли момент для сохранения
+    
     # --- ЛОГИКА СОХРАНЕНИЯ В ФАЙЛ ---
     # Проверяем, настал ли момент для сохранения
     if frame_counter % SAVE_INTERVAL == 0:
