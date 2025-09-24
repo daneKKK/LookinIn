@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 
 
 class ScaledBasis(nn.Module):
-    def __init__(self, init_scales=(.05, 0.05, .1)):
+    def __init__(self, init_scales=(.5, 0.5, .5)):
         super().__init__()
         self.q = nn.Parameter(torch.tensor((0., 0., 0., 1.)))  # quaternion for rotation
         self.scales = nn.Parameter(torch.tensor(init_scales, dtype=torch.float))
@@ -34,6 +34,7 @@ class ManifoldFitter:
         self.lr = lr
         self.steps = steps
         self.calibration_dir = calibration_dir
+        self.true_loss = True
 
         # learnable params
         self.basis = ScaledBasis().to(device)
@@ -44,10 +45,15 @@ class ManifoldFitter:
     def residuals(self, u, v, l):
         phi, psi, n = self.basis()
         a = u[:, None] * phi[None, :] + v[:, None] * psi[None, :] + self.s0[None, :]
-        # Compute cross product
-        crosses = torch.cross(a, l, dim=1)       # (N,3)
-        norms = torch.norm(crosses, dim=1)  # L2 norm per row
-        return norms  # or torch.sum(norms) if you want sum
+        if not self.true_loss:
+            # Compute cross product
+            crosses = torch.cross(a, l, dim=1)       # (N,3)
+            norms = torch.norm(crosses, dim=1)  # L2 norm per row
+            return (norms ** 2).mean() + 1 / (psi.norm() ** 2 + phi.norm() ** 2 + n.norm() ** 2)  # or torch.sum(norms) if you want sum
+        else:
+            nl = torch.einsum("ni,i->n", l, n)
+            ns = torch.dot(n, self.s0)
+            return (torch.norm(a - l * ns / nl[:, None]) ** 2).mean() + 1 / (psi.norm() ** 2 + phi.norm() ** 2 + n.norm() ** 2) 
     
     def get_ray_directions(self, landmarks):
         return torch.Tensor([process_landmarks(landmark.numpy())[1] for landmark in landmarks], device=self.device)
@@ -84,14 +90,14 @@ class ManifoldFitter:
             # --- training step ---
             opt.zero_grad()
             train_res = self.residuals(u_train, v_train, l_train)
-            train_loss = (train_res**2).mean()
+            train_loss = (train_res)
             train_loss.backward()
             opt.step()
 
             # --- validation evaluation ---
             with torch.no_grad():
                 val_res = self.residuals(u_val, v_val, l_val)
-                val_loss = (val_res**2).mean().item()
+                val_loss = (val_res).item()
 
             tqdm.write(f"Step {step}, Train Loss: {train_loss.item():.6e}, Val Loss: {val_loss:.6e}")
 
