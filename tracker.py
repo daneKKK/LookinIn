@@ -5,6 +5,10 @@ import mediapipe as mp
 import numpy as np
 import time
 import pyvista as pv
+import yaml
+
+from utils import get_screen_size, get_landmarks, process_landmarks
+from manifold_fitter import ManifoldFitter
 
 # Constants
 ALERT_FRAMES = 50
@@ -71,9 +75,7 @@ def draw_landmarks_on_image(rgb_image, detection_result, indices=None):
             
     return annotated_image
 
-
-
-def proces_frame(cap, landmarker) -> bool:
+def process_frame(cap, landmarker) -> bool:
         global off_center_count, frame_counter
         # Чтение кадра с камеры
         success, frame = cap.read()
@@ -89,7 +91,7 @@ def proces_frame(cap, landmarker) -> bool:
 
         frame_timestamp_ms = int(cap.get(cv2.CAP_PROP_POS_MSEC))
         face_landmarker_result = landmarker.detect_for_video(mp_image, frame_timestamp_ms)
-
+        
         annotated_frame = frame # По умолчанию используем оригинальный кадр
         annotated_frame = draw_landmarks_on_image(frame, face_landmarker_result, indices=LEFT_IRIS+RIGHT_IRIS)
         cv2.imshow('3D Face Landmarks', annotated_frame)
@@ -100,6 +102,42 @@ def proces_frame(cap, landmarker) -> bool:
             cv2.putText(annotated_frame, 'FOCUS!', (w // 3, h // 2),
                         cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
         cv2.imshow('3D Face Landmarks', annotated_frame)
+        
+        
+        w, h = get_screen_size()
+        blank_frame = np.zeros((h, w, 3), dtype=np.uint8)
+        landmarks_array = get_landmarks(face_landmarker_result,
+                                        w,
+                                        h,
+                                        as_array=True)
+        eye_direction = process_landmarks(landmarks_array)[1]
+        l = np.array(eye_direction)
+        modelpath = 'calibration/daniil/params.npz'
+        f = ManifoldFitter(calibration_dir='calibration/daniil')
+        f.init_from_file(modelpath)
+        u, v = f.infer_one(landmarks_array)
+        print(u, v, l)
+        u = np.clip(u, 0, w)
+        v = np.clip(v, 0, h)
+        frame = cv2.circle(
+            blank_frame,
+            (int(u), int(v)),
+            10,
+            (0,0,255),
+            thickness=-1
+        )
+        cv2.imshow('CALIBRATION', blank_frame)
+        
+        if frame_counter % SAVE_INTERVAL == 0:
+            face_points = pv.PolyData(landmarks_array)
+            face_vector = pv.Arrow(start=np.mean(landmarks_array, axis=0), direction=l*500, scale=200)
+            
+            scene = pv.MultiBlock()
+            scene.append(face_points, name="face_points")
+            scene.append(face_vector, name="face_vector")
+            
+            scene.save(f"saved/scene_frame_{(frame_counter // SAVE_INTERVAL):04d}.vtm")
+        
         return success
 
 off_center_count = 0
@@ -118,7 +156,7 @@ def main() -> None:
         # Инициализация видеозахвата с веб-камеры (0 - обычно встроенная камера)
         cap = cv2.VideoCapture(0)
         while success:
-            success = proces_frame(cap, landmarker)
+            success = process_frame(cap, landmarker)
             if cv2.waitKey(5) & 0xFF == ord('q'):
                 break
     

@@ -61,7 +61,7 @@ class ManifoldFitter:
               landmarks):
         l = process_landmarks(landmarks)[1]
         phi_sqr = np.dot(self.phi, self.phi)
-        psi_sqr = np.dor(self.psi, self.psi)
+        psi_sqr = np.dot(self.psi, self.psi)
 
         s_phi = np.dot(self.phi, self.s0)
         s_psi = np.dot(self.psi, self.s0)
