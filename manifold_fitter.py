@@ -42,7 +42,7 @@ class ManifoldFitter:
 
         self.params = [self.s0] + list(self.basis.parameters())
     
-
+    @eval
     def infer_one(self,
               landmarks):
         l = self.get_ray_directions(landmarks)[0] # Nx3
@@ -57,13 +57,21 @@ class ManifoldFitter:
 
         u = (-s_phi + l * ns / nl) / phi_sqr
         v = (-s_psi + l * ns / nl) / psi_sqr
-        
         return u, v
         
+    @staticmethod
+    def dot(x, y):
+        n, m = len(x.shape), len(y.shape)
+        if n > m:
+            return ManifoldFitter.dot(y, x)
+        elif n == m == 1:
+            return torch.dot(x, y)
+        elif n == 1 and m == 2:
+
+
+
     
-    def get_uv(self, l):
-        l = l[0]
-        u = /
+    dev uv_batch(self)
 
 
 
