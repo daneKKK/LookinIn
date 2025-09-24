@@ -59,7 +59,7 @@ class Calibrator:
         blank_frame = np.zeros((self.h, self.w, 3), dtype=np.uint8)
         blank_frame[:, :] = self.background_color
         if self.cur_step == self.x_steps * self.y_steps:
-            raise KeyboardInterrupt()
+            return None
 
 
         if not self.is_warning:
@@ -103,8 +103,7 @@ class Calibrator:
         frame = self.create_frame()
         if frame is None:
             self.save_calibration()
-            return 
-            
+            raise KeyboardInterrupt()
 
         cv2.imshow('current_frame', frame)
         key = cv2.waitKey(int(self.time_per_circle_sec * 1000))
