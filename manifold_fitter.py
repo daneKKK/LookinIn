@@ -59,7 +59,7 @@ class ManifoldFitter:
     
     def infer_one(self,
               landmarks):
-        l = self.get_ray_directions(landmarks)[0] # Nx3
+        l = process_landmarks(landmarks)[1]
         phi_sqr = np.dot(self.phi, self.phi)
         psi_sqr = np.dor(self.psi, self.psi)
 
@@ -198,6 +198,6 @@ class ManifoldFitter:
 
 
 if __name__ == "__main__":
-    calib_folder = "calibration/stas/"
+    calib_folder = "calibration/daniil/"
     fitter = ManifoldFitter(calib_folder, lr=1e-3, steps=20000)
     fitter.run()
