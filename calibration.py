@@ -91,8 +91,9 @@ class Calibrator:
         return frame
 
     def save_calibration(self):
-        self.u = np.array(self.u)
-        self.v = np.array(self.v)
+        uv = np.array(self.circle_centers)
+        self.u = uv[:, 0]
+        self.v = uv[:, 1]
         p = self.save_path
         np.save(osp.join(p, "u.npy"), self.u)
         np.save(osp.join(p, "v.npy"), self.v)
