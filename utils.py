@@ -86,7 +86,7 @@ def get_landmarks(
             landmark = face_landmarks[ind]
             x = int(landmark.x * w)
             y = int(landmark.y * h)
-            z = landmark.z
+            z = landmark.z * w
             if as_array:
                 res.append((x, y, z))
             else:
