@@ -1,3 +1,4 @@
+import argparse
 import time
 import cv2
 import numpy as np
@@ -161,9 +162,13 @@ class Calibrator:
         
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--user', type=str)
+    args = parser.parse_args()
     calib = Calibrator(
         save_folder="calibration",
-        user_name="stas",
+        user_name=args.user,
         )
     calib.run()
+
 
