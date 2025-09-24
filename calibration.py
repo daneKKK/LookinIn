@@ -46,6 +46,8 @@ class Calibrator:
         self.time_per_circle_sec = 0.5
 
         self.saved_landmarks = []
+        self.u = []
+        self.v = []
 
         self.save_path = osp.join(save_folder, user_name)
         if not osp.exists(osp.join(save_folder, user_name)):
@@ -55,6 +57,9 @@ class Calibrator:
                     ) -> np.ndarray:
         blank_frame = np.zeros((self.h, self.w, 3), dtype=np.uint8)
         blank_frame[:, :] = self.background_color
+        if self.cur_step == self.x_steps * self.y_steps:
+            raise KeyboardInterrupt()
+
 
         if not self.is_warning:
             frame = cv2.circle(
@@ -84,8 +89,22 @@ class Calibrator:
             self.is_warning = False
         return frame
 
+    def save_calibration(self):
+        self.u = np.array(self.u)
+        self.v = np.array(self.v)
+        p = self.save_path
+        np.save(osp.join(p, "u.npy"), self.u)
+        np.save(osp.join(p, "v.npy"), self.v)
+        np.save(osp.join(p, "landmarks.npy"), self.saved_landmarks)
+
+
     def show_frame(self):
         frame = self.create_frame()
+        if frame is None:
+            self.save_calibration()
+            return 
+            
+
         cv2.imshow('current_frame', frame)
         key = cv2.waitKey(int(self.time_per_circle_sec * 1000))
         if key == ord('q'):
@@ -102,14 +121,13 @@ class Calibrator:
                 mp_image,
                 frame_timestamp_ms
                 )
-            landmark_dict = get_landmarks(face_landmarker_result,
+            landmarks_array = get_landmarks(face_landmarker_result,
                                           self.w,
                                           self.h,
-                                          )
-            self.saved_landmarks.append(landmark_dict)
-            with open(f"{self.save_path}/{self.cur_step}.yaml", 'w') as f:
-                yaml.dump(landmark_dict, f)
-                
+                                          as_array=True)
+            self.saved_landmarks.append(landmarks_array)
+            # with open(f"{self.save_path}/{self.cur_step}.yaml", 'w') as f:
+            #     yaml.dump(landmark_dict, f)
         else:
             print("WEBCAM DID NOT WORK")
             self.saved_landmarks.append(None)
