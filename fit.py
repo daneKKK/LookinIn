@@ -23,7 +23,7 @@ class Fitter:
     @staticmethod
     def fit_plane_in_3d(
                         points):
-        centroid = points.mean(aixs=0)
+        centroid = points.mean(axis=0)
         X = points - centroid
         _, _, vh = np.linalg.svd(X, full_matrices=False)
         normal = vh[2, :]
@@ -78,7 +78,6 @@ class Fitter:
         center3d = centroid + center2d[0]*u + center2d[1]*v
         return center3d, r
     
-    def 
     
 
     

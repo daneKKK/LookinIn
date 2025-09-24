@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from screeninfo import get_monitors
-
+from fit import Fitter
 
 def get_screen_size():
     """works only with one monitory correctly"""

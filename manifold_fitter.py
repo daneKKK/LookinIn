@@ -45,7 +45,7 @@ class ManifoldFitter:
         return norms  # or torch.sum(norms) if you want sum
     
     def get_ray_directions(self, landmarks):
-        return landmarks[:, -1, :3]
+        return [process_landmarks(landmark)[1] for landmark in landmarks]
 
     def load_state(self):
         u, v, landmarks = [np.load(f"{self.calibration_dir}/{name}.npy") for name in ('u', 'v', 'landmarks')]
