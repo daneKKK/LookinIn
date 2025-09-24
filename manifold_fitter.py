@@ -31,15 +31,17 @@ class ManifoldFitter:
         # learnable params
         self.basis = ScaledBasis().to(device)
         self.s0 = nn.Parameter(torch.randn(3, device=device))
-        self.c = nn.Parameter(torch.randn(3, device=device))
 
         self.params = [self.s0, self.c] + list(self.basis.parameters())
 
     def residuals(self, u, v, l):
         phi, psi, n = self.basis()
-        lhs = u[:, None] * phi + v[:, None] * psi + self.s0 - self.c
-        rhs = l * ((n @ (self.s0 - self.c)) / (n @ l.T)).unsqueeze(1)
-        return lhs - rhs
+        a = u[:, None] * phi[None, :] + v[:, None] * psi[None, :] + self.s0[None, :]
+        # Compute cross product
+        crosses = torch.cross(a, l)       # (N,3)
+        norms = torch.norm(crosses, dim=1)  # L2 norm per row
+        return norms.mean()  # or torch.sum(norms) if you want sum
+
 
     def run(self, u, v, l):
         # convert to torch
@@ -64,3 +66,11 @@ class ManifoldFitter:
             "s0": self.s0.detach().cpu().numpy(),
             "c": self.c.detach().cpu().numpy(),
         }
+
+
+def main():
+    file_path = "calib.yaml"
+    calib_folder = ""
+    fitter = ManifoldFitter(3e-4, 2000)
+    u, v, l = ...
+    fitter.run()
