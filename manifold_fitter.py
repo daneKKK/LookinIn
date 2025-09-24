@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -23,10 +24,11 @@ class ScaledBasis(nn.Module):
         return phi, psi, n
 
 class ManifoldFitter:
-    def __init__(self, lr=1e-2, steps=2000, device="cpu"):
+    def __init__(self, calibration_dir: str, lr=1e-2, steps=2000, device="cpu"):
         self.device = device
         self.lr = lr
         self.steps = steps
+        self.calibration_dir = calibration_dir
 
         # learnable params
         self.basis = ScaledBasis().to(device)
@@ -41,13 +43,24 @@ class ManifoldFitter:
         crosses = torch.cross(a, l)       # (N,3)
         norms = torch.norm(crosses, dim=1) ** 2  # L2 norm per row
         return norms.mean()  # or torch.sum(norms) if you want sum
+    
+    def get_ray_direcetions(self, landmarks):
+        raise NotImplementedError()
+
+    def load_state(self):
+        u, v, landmarks = [np.load(f"{self.calibration_dir}/{name}.npy") for name in ('u', 'v', 'landmarks')]
+
+        u = torch.tensor(u, dtype=torch.float32, device=self.device)
+        v = torch.tensor(v, dtype=torch.float32, device=self.device)
+        landmarks = torch.tensor(landmarks, dtype=torch.float32, device=self.device)
+        
+        l = self.get_ray_directions(landmarks)
+        return u, v, l
 
 
     def run(self, u, v, l):
         # convert to torch
-        u = torch.tensor(u, dtype=torch.float32, device=self.device)
-        v = torch.tensor(v, dtype=torch.float32, device=self.device)
-        l = torch.tensor(l, dtype=torch.float32, device=self.device)
+        u, v, l = self.load_state()
 
         opt = optim.Adam(self.params, lr=self.lr)
         for step in range(self.steps):
