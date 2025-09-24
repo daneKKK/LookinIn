@@ -53,6 +53,9 @@ class ManifoldFitter:
         self.s0 = nn.Parameter(torch.randn(3, device=device))
 
         self.params = [self.s0] + list(self.basis.parameters())
+        
+    def init_from_file(self, path):
+        self.phi, self.psi, self.n, self.s0 = [np.load(path)[param] for param in ('phi', 'psi', 'n', 's0')]
     
     def infer_one(self,
               landmarks):
@@ -187,6 +190,7 @@ class ManifoldFitter:
         # Save to YAML
         print("DONE")
         print(best_params)
+        np.savez(f'{self.calibration_dir}/params.npz', **best_params)
         with open(f"{self.calibration_dir}/calibrated_parameters.yaml", 'w') as f:
             yaml.dump(best_params, f)
 
