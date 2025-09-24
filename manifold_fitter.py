@@ -4,9 +4,9 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 class ScaledBasis(nn.Module):
-    def __init__(self, init_scales=(.5, 0.5, 1.0)):
+    def __init__(self, init_scales=(.05, 0.05, .1)):
         super().__init__()
-        self.q = nn.Parameter(torch.randn(4))  # quaternion for rotation
+        self.q = nn.Parameter(torch.tensor((0., 0., 0., 1.)))  # quaternion for rotation
         self.scales = nn.Parameter(torch.tensor(init_scales, dtype=torch.float))
 
     def forward(self):
@@ -74,16 +74,19 @@ class ManifoldFitter:
 
         # extract learned constants
         phi, psi, n = self.basis()
-        return {
+        res = {
             "phi": phi.detach().cpu().numpy(),
             "psi": psi.detach().cpu().numpy(),
             "n": n.detach().cpu().numpy(),
             "s0": self.s0.detach().cpu().numpy(),
         }
+        print("DONE")
+        print(res)
+        return res
 
 
 if __name__ == "__main__":
     calib_folder = "calibration/stas/"
-    fitter = ManifoldFitter(calib_folder, 1e-2, 10000)
+    fitter = ManifoldFitter(calib_folder, 3e-4, 20000)
     fitter.run()
 
