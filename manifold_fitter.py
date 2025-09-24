@@ -41,6 +41,31 @@ class ManifoldFitter:
         self.s0 = nn.Parameter(torch.randn(3, device=device))
 
         self.params = [self.s0] + list(self.basis.parameters())
+    
+
+    def infer_one(self,
+              landmarks):
+        l = self.get_ray_directions(landmarks)[0] # Nx3
+        phi_sqr = np.dot(self.phi, self.phi)
+        psi_sqr = np.dor(self.psi, self.psi)
+
+        s_phi = np.dot(self.phi, self.s0)
+        s_psi = np.dot(self.psi, self.s0)
+
+        ns = np.dot(self.s0, self.n)
+        nl = np.dot(self.n, l)
+
+        u = (-s_phi + l * ns / nl) / phi_sqr
+        v = (-s_psi + l * ns / nl) / psi_sqr
+        
+        return u, v
+        
+    
+    def get_uv(self, l):
+        l = l[0]
+        u = /
+
+
 
     def residuals(self, u, v, l):
         phi, psi, n = self.basis()
@@ -60,11 +85,9 @@ class ManifoldFitter:
 
     def load_state(self):
         u, v, landmarks = [np.load(f"{self.calibration_dir}/{name}.npy") for name in ('u', 'v', 'landmarks')]
-
         u = torch.tensor(u, dtype=torch.float32, device=self.device)
         v = torch.tensor(v, dtype=torch.float32, device=self.device)
         landmarks = torch.tensor(landmarks, dtype=torch.float32, device=self.device)
-        
         l = self.get_ray_directions(landmarks)
         #print(l)
 
