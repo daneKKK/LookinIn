@@ -5,6 +5,8 @@ import torch.optim as optim
 from tqdm import tqdm
 from utils import process_landmarks
 import yaml
+from sklearn.model_selection import train_test_split
+
 
 class ScaledBasis(nn.Module):
     def __init__(self, init_scales=(.05, 0.05, .1)):
@@ -63,36 +65,57 @@ class ManifoldFitter:
         return u, v, l
 
 
-    def run(self):
-        # convert to torch
+    def run(self, val_split=0.25):
+        # Load and convert to torch
         u, v, l = self.load_state()
 
+        # Split into training and validation sets
+        u_train, u_val, v_train, v_val, l_train, l_val = train_test_split(
+            u.cpu().numpy(), v.cpu().numpy(), l.cpu().numpy(),
+            test_size=val_split, random_state=42
+        )
+        u_train, v_train, l_train = map(lambda x: torch.tensor(x, dtype=torch.float32, device=self.device), (u_train, v_train, l_train))
+        u_val, v_val, l_val = map(lambda x: torch.tensor(x, dtype=torch.float32, device=self.device), (u_val, v_val, l_val))
+
+        best_val_loss = float('inf')
         opt = optim.Adam(self.params, lr=self.lr)
+
         for step in tqdm(range(self.steps)):
+            # --- training step ---
             opt.zero_grad()
-            res = self.residuals(u, v, l)
-            loss = (res**2).mean()
-            tqdm.write(f"{loss.item()}")
-            loss.backward()
+            train_res = self.residuals(u_train, v_train, l_train)
+            train_loss = (train_res**2).mean()
+            train_loss.backward()
             opt.step()
 
-        # extract learned constants
-        phi, psi, n = self.basis()
-        res = {
-            "phi": phi.detach().cpu().numpy(),
-            "psi": psi.detach().cpu().numpy(),
-            "n": n.detach().cpu().numpy(),
-            "s0": self.s0.detach().cpu().numpy(),
-        }
+            # --- validation evaluation ---
+            with torch.no_grad():
+                val_res = self.residuals(u_val, v_val, l_val)
+                val_loss = (val_res**2).mean().item()
+
+            tqdm.write(f"Step {step}, Train Loss: {train_loss.item():.6e}, Val Loss: {val_loss:.6e}")
+
+            # Save best parameters based on validation loss
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                phi, psi, n = self.basis()
+                best_params = {
+                    "phi": phi.detach().cpu().numpy(),
+                    "psi": psi.detach().cpu().numpy(),
+                    "n": n.detach().cpu().numpy(),
+                    "s0": self.s0.detach().cpu().numpy(),
+                }
+
+        # Save to YAML
         print("DONE")
-        print(res)
+        print(best_params)
         with open(f"{self.calibration_dir}/calibrated_parameters.yaml", 'w') as f:
-            yaml.dump(res, f)
-        return res
+            yaml.dump(best_params, f)
+
+        return best_params
 
 
 if __name__ == "__main__":
-    calib_folder = "calibration/daniil/"
-    fitter = ManifoldFitter(calib_folder, 3e-4, 20000)
+    calib_folder = "calibration/stas/"
+    fitter = ManifoldFitter(calib_folder, lr=3e-4, steps=20000)
     fitter.run()
-
