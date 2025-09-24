@@ -7,6 +7,14 @@ from utils import process_landmarks
 import yaml
 from sklearn.model_selection import train_test_split
 
+from enum import Enum, auto
+
+class LossType(Enum):
+    PROJ = auto()
+    TRUE = auto()
+    CROSS = auto()
+
+
 
 class ScaledBasis(nn.Module):
     def __init__(self, init_scales=(.5, 0.5, .5)):
@@ -27,6 +35,7 @@ class ScaledBasis(nn.Module):
         psi = self.scales[1] * R[:, 1]
         n   = self.scales[2] * R[:, 2]
         return phi, psi, n
+    
 
 class ManifoldFitter:
     def __init__(self, calibration_dir: str, lr=1e-2, steps=2000, device="cpu"):
@@ -34,7 +43,7 @@ class ManifoldFitter:
         self.lr = lr
         self.steps = steps
         self.calibration_dir = calibration_dir
-        self.true_loss = True
+        self.loss_type = LossType.PROJ
 
         # learnable params
         self.basis = ScaledBasis().to(device)
@@ -42,7 +51,6 @@ class ManifoldFitter:
 
         self.params = [self.s0] + list(self.basis.parameters())
     
-    @eval
     def infer_one(self,
               landmarks):
         l = self.get_ray_directions(landmarks)[0] # Nx3
@@ -52,41 +60,71 @@ class ManifoldFitter:
         s_phi = np.dot(self.phi, self.s0)
         s_psi = np.dot(self.psi, self.s0)
 
+        l_phi = np.dot(self.phi, l)
+        l_psi = np.dot(self.psi, l)
+
         ns = np.dot(self.s0, self.n)
         nl = np.dot(self.n, l)
 
-        u = (-s_phi + l * ns / nl) / phi_sqr
-        v = (-s_psi + l * ns / nl) / psi_sqr
+        u = (-s_phi + l_phi  * ns / nl) / phi_sqr
+        v = (-s_psi + l_psi * ns / nl) / psi_sqr
         return u, v
+    
+    def reproj_error(self, u, v, l):
+        phi, psi, n = self.basis()
+
+        l_phi = torch.einsum("i,ni->n", phi, l)
+        l_psi = torch.einsum("i,ni->n", phi, l)
+        nl = torch.einsum("i,ni->n", n, l)
+
+        phi_sqr = torch.dot(phi, phi)
+        psi_sqr = torch.dot(psi, psi)
+
+        s_phi = torch.dot(phi, self.s0)
+        s_psi = torch.dot(psi, self.s0)
+
+        ns = torch.dot(self.s0, n)
+
+              
+        u_pred = (-s_phi + l_phi * ns / nl) / phi_sqr
+        v_pred = (-s_psi + l_psi * ns / nl) / psi_sqr
+
+        return ((u - u_pred) ** 2 + (v - v_pred) ** 2).mean(axis=0)
+        
+    def cross_loss(self, u, v, l):
+        phi, psi, n = self.basis()
+        a = u[:, None] * phi[None, :] + v[:, None] * psi[None, :] + self.s0[None, :]
+        # Compute cross product
+        crosses = torch.cross(a, l, dim=1)       # (N,3)
+        norms = torch.norm(crosses, dim=1)  # L2 norm per row
+        return (norms ** 2).mean() + 1 / (psi.norm() ** 2 + phi.norm() ** 2 + n.norm() ** 2)  # or torch.sum(norms) if you want sum
+
+    def true_loss(self, u, v, l):
+        phi, psi, n = self.basis()
+        a = u[:, None] * phi[None, :] + v[:, None] * psi[None, :] + self.s0[None, :]
+        nl = torch.einsum("ni,i->n", l, n)
+        ns = torch.dot(n, self.s0)
+        return (torch.norm(a - l * ns / nl[:, None]) ** 2).mean() + 1 / (psi.norm() ** 2 + phi.norm() ** 2 + n.norm() ** 2) 
         
     @staticmethod
-    def dot(x, y):
+    def same_dot(x, y):
         n, m = len(x.shape), len(y.shape)
         if n > m:
             return ManifoldFitter.dot(y, x)
         elif n == m == 1:
-            return torch.dot(x, y)
+            return torch.dot(x, y)[None, None]
         elif n == 1 and m == 2:
-
-
-
-    
-    dev uv_batch(self)
-
-
+            return torch.einsum("i,ni->n", x, y)[:, None]
+        else:
+            return torch.einsum('ni,ni->n', x, y)[:, None]
 
     def residuals(self, u, v, l):
-        phi, psi, n = self.basis()
-        a = u[:, None] * phi[None, :] + v[:, None] * psi[None, :] + self.s0[None, :]
-        if not self.true_loss:
-            # Compute cross product
-            crosses = torch.cross(a, l, dim=1)       # (N,3)
-            norms = torch.norm(crosses, dim=1)  # L2 norm per row
-            return (norms ** 2).mean() + 1 / (psi.norm() ** 2 + phi.norm() ** 2 + n.norm() ** 2)  # or torch.sum(norms) if you want sum
-        else:
-            nl = torch.einsum("ni,i->n", l, n)
-            ns = torch.dot(n, self.s0)
-            return (torch.norm(a - l * ns / nl[:, None]) ** 2).mean() + 1 / (psi.norm() ** 2 + phi.norm() ** 2 + n.norm() ** 2) 
+        if self.loss_type ==  LossType.PROJ:
+            return self.reproj_error( u, v, l)
+        elif self.loss_type == LossType.CROSS:
+            return self.cross_loss(u, v, l)
+        elif self.loss_type == LossType.TRUE:
+            return self.true_loss(u, v, l)
     
     def get_ray_directions(self, landmarks):
         return torch.Tensor([process_landmarks(landmark.numpy())[1] for landmark in landmarks], device=self.device)
