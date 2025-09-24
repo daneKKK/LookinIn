@@ -24,14 +24,14 @@ LEFT_EYE_OUTLINE = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159
 RIGHT_EYE_OUTLINE = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
 
     
-def process_landmarks(detection_result, h, w):
+def process_landmarks(face_landmarks_3d):
     '''
     Gets 3d landmarks. Return two eye vectors and nose vector, all in our abstract coordinates.
     '''
-    face_landmarks_3d = np.array([(l.x, l.y, l.z) for l in detection_result.face_landmarks[0]])
-    face_landmarks_3d[:, 0] *= w
-    face_landmarks_3d[:, 1] = h*(1 - face_landmarks_3d[:, 1])
-    face_landmarks_3d[:, 2] *= w
+    #face_landmarks_3d = np.array([(l.x, l.y, l.z) for l in detection_result.face_landmarks[0]])
+    #face_landmarks_3d[:, 0] *= w
+    #face_landmarks_3d[:, 1] = h*(1 - face_landmarks_3d[:, 1])
+    #face_landmarks_3d[:, 2] *= w
     #Calculate face center as center of a nose
     face_center = np.mean(face_landmarks_3d[NOSE_INDICES], axis=0)
     

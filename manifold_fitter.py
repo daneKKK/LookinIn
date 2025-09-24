@@ -3,6 +3,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
+from utils import process_landmarks
+import yaml
+
 class ScaledBasis(nn.Module):
     def __init__(self, init_scales=(.05, 0.05, .1)):
         super().__init__()
@@ -45,7 +48,7 @@ class ManifoldFitter:
         return norms  # or torch.sum(norms) if you want sum
     
     def get_ray_directions(self, landmarks):
-        return [process_landmarks(landmark)[1] for landmark in landmarks]
+        return torch.Tensor([process_landmarks(landmark.numpy())[1] for landmark in landmarks], device=self.device)
 
     def load_state(self):
         u, v, landmarks = [np.load(f"{self.calibration_dir}/{name}.npy") for name in ('u', 'v', 'landmarks')]
@@ -55,6 +58,7 @@ class ManifoldFitter:
         landmarks = torch.tensor(landmarks, dtype=torch.float32, device=self.device)
         
         l = self.get_ray_directions(landmarks)
+        #print(l)
 
         return u, v, l
 
@@ -82,11 +86,13 @@ class ManifoldFitter:
         }
         print("DONE")
         print(res)
+        with open(f"{self.calibration_dir}/calibrated_parameters.yaml", 'w') as f:
+            yaml.dump(res, f)
         return res
 
 
 if __name__ == "__main__":
-    calib_folder = "calibration/stas/"
+    calib_folder = "calibration/daniil/"
     fitter = ManifoldFitter(calib_folder, 3e-4, 20000)
     fitter.run()
 
