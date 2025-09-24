@@ -1,13 +1,16 @@
 import numpy as np
+from screeninfo import get_monitors
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
-from utils import process_landmarks
+from utils import get_screen_size, process_landmarks
 import yaml
 from sklearn.model_selection import train_test_split
 
 from enum import Enum, auto
+
+w, h = get_screen_size()
 
 class LossType(Enum):
     PROJ = auto()
@@ -89,7 +92,7 @@ class ManifoldFitter:
         u_pred = (-s_phi + l_phi * ns / nl) / phi_sqr
         v_pred = (-s_psi + l_psi * ns / nl) / psi_sqr
 
-        return ((u - u_pred) ** 2 + (v - v_pred) ** 2).mean(axis=0)
+        return ((u - u_pred) ** 2 + (v - v_pred) ** 2).mean(axis=0)  
         
     def cross_loss(self, u, v, l):
         phi, psi, n = self.basis()
@@ -192,5 +195,5 @@ class ManifoldFitter:
 
 if __name__ == "__main__":
     calib_folder = "calibration/stas/"
-    fitter = ManifoldFitter(calib_folder, lr=3e-4, steps=20000)
+    fitter = ManifoldFitter(calib_folder, lr=1e-3, steps=20000)
     fitter.run()
