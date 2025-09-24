@@ -39,7 +39,7 @@ class ManifoldFitter:
         a = u[:, None] * phi[None, :] + v[:, None] * psi[None, :] + self.s0[None, :]
         # Compute cross product
         crosses = torch.cross(a, l)       # (N,3)
-        norms = torch.norm(crosses, dim=1)  # L2 norm per row
+        norms = torch.norm(crosses, dim=1) ** 2  # L2 norm per row
         return norms.mean()  # or torch.sum(norms) if you want sum
 
 
