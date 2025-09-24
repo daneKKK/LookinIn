@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
+from tqdm import tqdm
 class ScaledBasis(nn.Module):
     def __init__(self, init_scales=(1.0, 1.0, 1.0)):
         super().__init__()
@@ -34,18 +34,18 @@ class ManifoldFitter:
         self.basis = ScaledBasis().to(device)
         self.s0 = nn.Parameter(torch.randn(3, device=device))
 
-        self.params = [self.s0, self.c] + list(self.basis.parameters())
+        self.params = [self.s0] + list(self.basis.parameters())
 
     def residuals(self, u, v, l):
         phi, psi, n = self.basis()
         a = u[:, None] * phi[None, :] + v[:, None] * psi[None, :] + self.s0[None, :]
         # Compute cross product
-        crosses = torch.cross(a, l)       # (N,3)
+        crosses = torch.cross(a, l, dim=1)       # (N,3)
         norms = torch.norm(crosses, dim=1) ** 2  # L2 norm per row
         return norms.mean()  # or torch.sum(norms) if you want sum
     
-    def get_ray_direcetions(self, landmarks):
-        raise NotImplementedError()
+    def get_ray_directions(self, landmarks):
+        return landmarks[:, -1, :3]
 
     def load_state(self):
         u, v, landmarks = [np.load(f"{self.calibration_dir}/{name}.npy") for name in ('u', 'v', 'landmarks')]
@@ -55,18 +55,20 @@ class ManifoldFitter:
         landmarks = torch.tensor(landmarks, dtype=torch.float32, device=self.device)
         
         l = self.get_ray_directions(landmarks)
+
         return u, v, l
 
 
-    def run(self, u, v, l):
+    def run(self):
         # convert to torch
         u, v, l = self.load_state()
 
         opt = optim.Adam(self.params, lr=self.lr)
-        for step in range(self.steps):
+        for step in tqdm(range(self.steps)):
             opt.zero_grad()
             res = self.residuals(u, v, l)
             loss = (res**2).mean()
+            tqdm.write(f"{loss.item()}")
             loss.backward()
             opt.step()
 
@@ -77,13 +79,11 @@ class ManifoldFitter:
             "psi": psi.detach().cpu().numpy(),
             "n": n.detach().cpu().numpy(),
             "s0": self.s0.detach().cpu().numpy(),
-            "c": self.c.detach().cpu().numpy(),
         }
 
 
-def main():
-    file_path = "calib.yaml"
-    calib_folder = ""
-    fitter = ManifoldFitter(3e-4, 2000)
-    u, v, l = ...
+if __name__ == "__main__":
+    calib_folder = "calibration/stas/"
+    fitter = ManifoldFitter(calib_folder, 3e-4, 2000)
     fitter.run()
+
