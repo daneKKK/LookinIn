@@ -28,10 +28,6 @@ def process_landmarks(face_landmarks_3d):
     '''
     Gets 3d landmarks. Return two eye vectors and nose vector, all in our abstract coordinates.
     '''
-    #face_landmarks_3d = np.array([(l.x, l.y, l.z) for l in detection_result.face_landmarks[0]])
-    #face_landmarks_3d[:, 0] *= w
-    #face_landmarks_3d[:, 1] = h*(1 - face_landmarks_3d[:, 1])
-    #face_landmarks_3d[:, 2] *= w
     #Calculate face center as center of a nose
     face_center = np.mean(face_landmarks_3d[NOSE_INDICES], axis=0)
     
@@ -42,8 +38,8 @@ def process_landmarks(face_landmarks_3d):
     
     # Fitting eyes to the sphere
     fitter = Fitter()
-    left_eye_sphere_c, left_eye_sphere_r = fitter.fit_circle_in_3d(face_landmarks_3d[LEFT_EYE_OUTLINE])
-    right_eye_sphere_c, right_eye_sphere_r = fitter.fit_circle_in_3d(face_landmarks_3d[RIGHT_EYE_OUTLINE])
+    left_eye_sphere_c, left_eye_sphere_r = fitter.fit_sphere(face_landmarks_3d[LEFT_EYE_OUTLINE])[0]
+    right_eye_sphere_c, right_eye_sphere_r = fitter.fit_sphere(face_landmarks_3d[RIGHT_EYE_OUTLINE])[0]
     
     # We need to explicitly calculate iris 3d coordinates by taking their projections on the eyes spheres
     for i in LEFT_IRIS:
@@ -62,9 +58,9 @@ def process_landmarks(face_landmarks_3d):
     right_iris_c = face_landmarks_3d[RIGHT_IRIS[0]]
     right_eye_dir = right_iris_c - right_eye_sphere_c
     right_eye_dir /= np.linalg.norm(right_eye_dir)
+    eyeballs = [(right_eye_sphere_r, right_eye_sphere_c), (left_eye_sphere_r, left_eye_sphere_c)]
     
-    
-    return np.mean([left_eye_sphere_c, right_eye_sphere_c], axis=0), np.mean([left_eye_dir, right_eye_dir], axis=0)
+    return np.mean([left_eye_sphere_c, right_eye_sphere_c], axis=0), np.mean([left_eye_dir, right_eye_dir], axis=0), eyeballs
 
 def get_landmarks(
         detection_result,
@@ -85,7 +81,7 @@ def get_landmarks(
         for ind in indices:
             landmark = face_landmarks[ind]
             x = int(landmark.x * w)
-            y = int(landmark.y * h)
+            y = int((1-landmark.y) * h)
             z = landmark.z * w
             if as_array:
                 res.append((x, y, z))

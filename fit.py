@@ -78,6 +78,16 @@ class Fitter:
         center3d = centroid + center2d[0]*u + center2d[1]*v
         return center3d, r
     
+    def fit_sphere(self, points):
+        """Sphere fitting using Linear Least Squares"""
+    
+        A = np.column_stack((2*points, np.ones(len(points))))
+        b = (points**2).sum(axis=1)
+        x, res, _, _ = np.linalg.lstsq(A, b)
+        center = x[:3]
+        radius = np.sqrt(x[0]**2 + x[1]**2 + x[2]**2 + x[3])
+    
+        return (center, radius), res
     
 
     

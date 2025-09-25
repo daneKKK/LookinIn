@@ -104,39 +104,61 @@ def process_frame(cap, landmarker) -> bool:
         cv2.imshow('3D Face Landmarks', annotated_frame)
         
         
-        w, h = get_screen_size()
-        blank_frame = np.zeros((h, w, 3), dtype=np.uint8)
+        screen_w, screen_h = get_screen_size()
+        
+        blank_frame = np.zeros((screen_h, screen_w, 3), dtype=np.uint8)
         landmarks_array = get_landmarks(face_landmarker_result,
                                         w,
                                         h,
                                         as_array=True)
-        eye_direction = process_landmarks(landmarks_array)[1]
+        eye_direction = process_landmarks(landmarks_array)[1] 
+        eyeballs = process_landmarks(landmarks_array)[2]
         l = np.array(eye_direction)
         modelpath = 'calibration/daniil/params.npz'
         f = ManifoldFitter(calibration_dir='calibration/daniil')
         f.init_from_file(modelpath)
         u, v = f.infer_one(landmarks_array)
-        print(u, v, l)
-        u = np.clip(u, 0, w)
-        v = np.clip(v, 0, h)
-        frame = cv2.circle(
+        u = np.clip(u, 0, screen_w)
+        v = np.clip(v, 0, screen_h)
+        blank_frame = cv2.circle(
             blank_frame,
             (int(u), int(v)),
             10,
             (0,0,255),
             thickness=-1
         )
+        cv2.putText(blank_frame, f'{l}', (w // 3, h // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
         cv2.imshow('CALIBRATION', blank_frame)
         
         if frame_counter % SAVE_INTERVAL == 0:
             face_points = pv.PolyData(landmarks_array)
             face_vector = pv.Arrow(start=np.mean(landmarks_array, axis=0), direction=l*500, scale=200)
+            left_eye_sphere = pv.Sphere(radius=eyeballs[0][0], center=eyeballs[0][1])
+            right_eye_sphere = pv.Sphere(radius=eyeballs[1][0], center=eyeballs[1][1])
             
             scene = pv.MultiBlock()
             scene.append(face_points, name="face_points")
             scene.append(face_vector, name="face_vector")
+            scene.append(left_eye_sphere, name="leye")
+            scene.append(right_eye_sphere, name="reye")
             
             scene.save(f"saved/scene_frame_{(frame_counter // SAVE_INTERVAL):04d}.vtm")
+            
+            # Открываем файл в режиме 'a' (append/добавление)
+            with open('save.xyz', 'a') as f:
+                # 1. Записываем количество точек
+                f.write(f"{len(landmarks_array)}\n")
+                
+                # 2. Записываем комментарий с номером кадра
+                f.write(f"# Frame number {frame_counter}\n")
+                
+                # 3. Записываем координаты всех точек
+                for i, landmark in enumerate(landmarks_array):
+                    # Форматируем строку: "1 x y z"
+                    # Обратите внимание на `1.0 - landmark.y` для инверсии оси Y
+                    line = f"{landmark[0]:.6f} {landmark[1]:.6f} {landmark[2]:.6f}\n"
+                    f.write(line)
         
         return success
 

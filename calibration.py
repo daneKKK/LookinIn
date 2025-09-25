@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from pyvista import set_default_active_vectors
 import yaml
-from utils import get_landmarks, get_screen_size
+from utils import get_landmarks, get_screen_size, process_landmarks
 from tracker import FaceLandmarker, options
 import os
 import os.path as osp
@@ -126,6 +126,7 @@ class Calibrator:
                                           self.w,
                                           self.h,
                                           as_array=True)
+            print(process_landmarks(landmarks_array)[1])
             self.saved_landmarks.append(landmarks_array)
             # with open(f"{self.save_path}/{self.cur_step}.yaml", 'w') as f:
             #     yaml.dump(landmark_dict, f)
