@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.optimize import minimize
 
 class Sphere:
     def __init__(self,
@@ -57,6 +58,18 @@ class Fitter:
         r_sq = cx*cx + cy*cy - Ccoef
         r = np.sqrt(np.abs(r_sq))
         return np.array([cx, cy]), r
+        
+    @staticmethod
+    def fit_sphere_in_3d_with_r(points, radius):
+        def sphere_residual(x, points, radius):
+            x0, y0, z0 = x
+            distances = np.sqrt((points[:, 0] - x0)**2 + 
+                                (points[:, 1] - y0)**2 + 
+                                (points[:, 2] - z0)**2)
+            return np.sum((distances - radius)**2)
+        initial_center = np.mean(points, axis=0)
+        result = minimize(sphere_residual, initial_center, args=(points, radius), method='L-BFGS-B')
+        return (np.array(result.x), radius), result
 
 
     @staticmethod

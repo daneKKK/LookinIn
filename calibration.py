@@ -4,11 +4,12 @@ import cv2
 import numpy as np
 from pyvista import set_default_active_vectors
 import yaml
-from utils import get_landmarks, get_screen_size, process_landmarks
+from utils import get_landmarks, get_screen_size, process_landmarks, find_affine_transform
 from tracker import FaceLandmarker, options
 import os
 import os.path as osp
 import mediapipe as mp
+from catboost import CatBoostRegressor
 
 
 class Calibrator:
@@ -104,6 +105,8 @@ class Calibrator:
         frame = self.create_frame()
         if frame is None:
             self.save_calibration()
+            self.running = False
+            return
             raise KeyboardInterrupt()
 
         cv2.imshow('current_frame', frame)
@@ -156,7 +159,8 @@ class Calibrator:
         cap = cv2.VideoCapture(0)
         self.success = True
         self.show_starting_screen()
-        while True:
+        self.running = True
+        while self.running:
             self.show_frame()
             if not self.is_warning:
                 self.get_webcam_frame(cap)
@@ -171,5 +175,25 @@ if __name__ == "__main__":
         user_name=args.user,
         )
     calib.run()
-
+    u = np.load(f'calibration/{args.user}/u.npy')
+    v = np.load(f'calibration/{args.user}/v.npy')
+    landmarks = np.load(f'calibration/{args.user}/landmarks.npy')
+    u = np.array([(u[i], v[i]) for i in range(len(u))], dtype=float)
+    l = np.array([process_landmarks(landmark)[1] for landmark in landmarks])[:, :2]
+    M = find_affine_transform(l, u)
+    np.save(f'calibration/{args.user}/M', M)
+    Ml = np.array([(M @ np.append(li, 1))[:2] for li in l])
+    model = CatBoostRegressor(
+        iterations=10000,
+        learning_rate=0.1,
+        depth=6,
+        loss_function='MultiRMSE',
+        verbose=True
+    )
+    model.fit(Ml, u)
+    CMl = model.predict(Ml)
+    np.save(f'calibration/{args.user}/CMl', CMl)
+    model.save_model(f'calibration/{args.user}/cb')
+    
+    
 
